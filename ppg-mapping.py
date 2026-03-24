@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 
 def evaluate_vo2_max_clinical_method(subject_info_path, measure_path):
-    # Load and clean
+    #load data
     sub_info = pd.read_csv(subject_info_path)
     sub_info.columns = sub_info.columns.str.strip()
     test_measure = pd.read_csv(measure_path)
@@ -13,27 +13,25 @@ def evaluate_vo2_max_clinical_method(subject_info_path, measure_path):
     
     for test_id in sub_info['ID_test'].unique():
         try:
-            # 1. Subject Metadata
+            # subject data
             meta = sub_info[sub_info['ID_test'] == test_id].iloc[0]
             age, weight = meta['Age'], meta['Weight']
             hr_max_theor = 220 - age
             
-            # 2. Extract Data & Find Resting HR
+            #extract data and find resting HR
             data = test_measure[test_measure['ID_test'] == test_id].copy()
             data = data.dropna(subset=['HR', 'Speed', 'VO2'])
             
-            # Estimate Resting HR from the first 30 seconds (usually low intensity/rest)
+            #estimate resting HR from the first 30 seconds
             hr_rest = data[data['time'] < 60]['HR'].min()
             if np.isnan(hr_rest) or hr_rest < 40: hr_rest = 65 
             hrr_total = hr_max_theor - hr_rest
             
-            # 3. STAGE FILTERING (The Accuracy Fix)
-            # Find the "Steady-State" heart rate for each treadmill speed stage
             stages = []
-            # Group by unique speeds (assuming the treadmill moves in steps)
+            # Group by unique speeds 
             for speed, group in data[data['Speed'] > 5.0].groupby('Speed'):
-                if len(group) > 25: # Stage must last at least 25 seconds
-                    # Take the mean of the LAST 10 seconds of the stage (Steady-State)
+                if len(group) > 25: 
+             
                     steady_hr = group['HR'].tail(10).mean()
                     
                     # Convert to %HRR (X-axis)
@@ -44,21 +42,21 @@ def evaluate_vo2_max_clinical_method(subject_info_path, measure_path):
                     speed_m_min = speed * 16.67
                     vo2_demand = 3.5 + (0.2 * speed_m_min)
                     
-                    # Only use the linear aerobic range (45% to 85% HRR)
+                    #use the linear aerobic range (45% to 85% HRR)
                     if 0.45 <= perc_hrr <= 0.85:
                         stages.append([perc_hrr, vo2_demand])
             
             if len(stages) < 3: continue
             
-            # 4. Linear Regression on Stable Points
+            #linear regression on included points
             stages = np.array(stages)
             slope, intercept = np.polyfit(stages[:, 0], stages[:, 1], 1)
             
-            # Extrapolate: VO2 Max is Y when %HRR = 1.0
+            # extrapolate
             est_vo2_max = (slope * 1.0) + intercept
             true_vo2_max = data['VO2'].max() / weight
             
-            # Basic sanity filter for outliers
+            #filter outliers
             if 15 < est_vo2_max < 90:
                 results.append({
                     'ID_test': test_id,
@@ -71,7 +69,7 @@ def evaluate_vo2_max_clinical_method(subject_info_path, measure_path):
 
     results_df = pd.DataFrame(results)
     
-    # --- PLOTTING ---
+
     fig, axes = plt.subplots(1, 3, figsize=(18, 5))
 
     # Plot 1: Predicted vs Actual
@@ -102,5 +100,5 @@ def evaluate_vo2_max_clinical_method(subject_info_path, measure_path):
     
     return results_df
 
-# Run the analysis
+
 results = evaluate_vo2_max_clinical_method('./dataset_ppg/subject-info.csv', './dataset_ppg/test_measure.csv')
