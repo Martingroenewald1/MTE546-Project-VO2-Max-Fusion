@@ -51,32 +51,20 @@ def evaluate_sweat_only_vo2max(feature_csv_path):
     # different combos that may give better results
 
     feature_sets = {
-        "lactate_basic": [
-            "lactate_mean",
-            "lactate_max",
-        ],
-
-        "lactate_plus_body": [
-            "age",
-            "weight",
-            "lactate_mean",
-            "lactate_max",
-        ],
-
         "sweat_basic": [
             "sweat_rate_mean",
             "sweat_rate_max",
+        ],
+
+        "sweat_threshold": [
+            "sweat_rate_max",
+            "sweat_rate_threshold",
         ],
 
         "sweat_trend": [
             "sweat_rate_mean",
             "sweat_rate_std",
             "sweat_rate_slope_time",
-        ],
-
-        "sweat_threshold": [
-            "sweat_rate_max",
-            "sweat_rate_threshold",
         ],
 
         "mixed_small_1": [
@@ -93,6 +81,18 @@ def evaluate_sweat_only_vo2max(feature_csv_path):
         "mixed_small_3": [
             "lactate_mean",
             "sweat_rate_std",
+        ],
+
+        "lactate_basic": [
+            "lactate_mean",
+            "lactate_max",
+        ],
+
+        "lactate_plus_body": [
+            "age",
+            "weight",
+            "lactate_mean",
+            "lactate_max",
         ],
     }
 
@@ -116,6 +116,8 @@ def evaluate_sweat_only_vo2max(feature_csv_path):
             abs_errors = []
             y_true_all = []
             y_pred_all = []
+            percent_errors = []
+
 
             for pid in df_sub["participant_id"].unique():
                 train_df = df_sub[df_sub["participant_id"] != pid]
@@ -133,10 +135,13 @@ def evaluate_sweat_only_vo2max(feature_csv_path):
                 abs_errors.append(abs(y_pred - y_true))
                 y_true_all.append(y_true)
                 y_pred_all.append(y_pred)
+                percent_errors.append(abs((y_pred - y_true) / y_true) * 100)
+
 
             mae = np.mean(abs_errors)
             rmse = np.sqrt(np.mean((np.array(y_pred_all) - np.array(y_true_all))**2))
             r2 = r2_score(y_true_all, y_pred_all)
+            mape = np.mean(percent_errors)
 
             all_results.append({
                 "features": feat_name,
@@ -144,6 +149,7 @@ def evaluate_sweat_only_vo2max(feature_csv_path):
                 "mae": mae,
                 "rmse": rmse,
                 "r2": r2,
+                "mape": mape
             })
 
     results_df = pd.DataFrame(all_results).sort_values("mae")
